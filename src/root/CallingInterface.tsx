@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, JSX } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,8 +37,75 @@ interface CallFormData {
 interface CallingInterfaceProps {
   visible: boolean;
   onClose: () => void;
-  callerDetails: CallerDetails;
+  callerDetails?: CallerDetails;
 }
+
+const CALLERS_DATA: CallerDetails[] = [
+  {
+    name: 'John Doe',
+    phone: '+1 (555) 123-4567',
+    company: 'ABC Corp',
+    designation: 'Manager',
+    email: 'john.doe@abccorp.com',
+    address: '123 Business St, City, State 12345',
+  },
+  {
+    name: 'Jane Smith',
+    phone: '+1 (555) 987-6543',
+    company: 'Tech Solutions Inc.',
+    designation: 'Senior Developer',
+    email: 'jane.smith@techsolutions.com',
+    address: '456 Innovation Drive, Tech City, TC 67890',
+  },
+  {
+    name: 'Michael Johnson',
+    phone: '+1 (555) 456-7890',
+    company: 'Global Marketing Ltd.',
+    designation: 'Marketing Director',
+    email: 'michael.johnson@globalmarketing.com',
+    address: '789 Creative Avenue, Marketing Hub, MH 54321',
+  },
+  {
+    name: 'Sarah Williams',
+    phone: '+1 (555) 321-6547',
+    company: 'DataFlow Systems',
+    designation: 'Data Analyst',
+    email: 'sarah.williams@dataflow.com',
+    address: '321 Analytics Street, Data City, DC 98765',
+  },
+  {
+    name: 'Robert Brown',
+    phone: '+1 (555) 654-3210',
+    company: 'NextGen Industries',
+    designation: 'CEO',
+    email: 'robert.brown@nextgen.com',
+    address: '654 Executive Plaza, Business District, BD 13579',
+  },
+  {
+    name: 'Emily Davis',
+    phone: '+1 (555) 789-0123',
+    company: 'Creative Design Studio',
+    designation: 'Art Director',
+    email: 'emily.davis@creativedesign.com',
+    address: '987 Design Boulevard, Art Quarter, AQ 24680',
+  },
+  {
+    name: 'David Wilson',
+    phone: '+1 (555) 012-3456',
+    company: 'Financial Advisors Inc.',
+    designation: 'Senior Consultant',
+    email: 'david.wilson@financialadvisors.com',
+    address: '159 Money Street, Finance District, FD 11223',
+  },
+  {
+    name: 'Lisa Thompson',
+    phone: '+1 (555) 345-6789',
+    company: 'HealthCare Plus',
+    designation: 'Operations Manager',
+    email: 'lisa.thompson@healthcareplus.com',
+    address: '753 Wellness Way, Medical Center, MC 33445',
+  },
+];
 
 type CallStatus = 'idle' | 'dialing' | 'ringing' | 'connected';
 
@@ -47,6 +114,7 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   onClose,
   callerDetails,
 }) => {
+  const [currentCallerIndex, setCurrentCallerIndex] = useState<number>(0);
   const [isCallActive, setIsCallActive] = useState<boolean>(false);
   const [timer, setTimer] = useState<number>(0);
   const [showForm, setShowForm] = useState<boolean>(false);
@@ -61,7 +129,13 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const callProgressRef = useRef<NodeJS.Timeout | null>(null);
+  const callProgressRef2 = useRef<NodeJS.Timeout | null>(null);
+  
+  // Get current caller details
+  const currentCaller = callerDetails || CALLERS_DATA[currentCallerIndex];
 
+  // Timer effect
   useEffect(() => {
     if (isCallActive) {
       timerRef.current = setInterval(() => {
@@ -77,6 +151,7 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, [isCallActive]);
@@ -84,6 +159,7 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   // Reset state when modal closes
   useEffect(() => {
     if (!visible) {
+      setCurrentCallerIndex(0);
       setIsCallActive(false);
       setCallStatus('idle');
       setTimer(0);
@@ -96,8 +172,37 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
         interested: false,
         appointmentScheduled: false,
       });
+      
+      // Clear all timers
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (callProgressRef.current) {
+        clearTimeout(callProgressRef.current);
+        callProgressRef.current = null;
+      }
+      if (callProgressRef2.current) {
+        clearTimeout(callProgressRef2.current);
+        callProgressRef2.current = null;
+      }
     }
   }, [visible]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (callProgressRef.current) {
+        clearTimeout(callProgressRef.current);
+      }
+      if (callProgressRef2.current) {
+        clearTimeout(callProgressRef2.current);
+      }
+    };
+  }, []);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -110,10 +215,18 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
     setCallStatus('dialing');
     setTimer(0);
     
+    // Clear any existing timeouts
+    if (callProgressRef.current) {
+      clearTimeout(callProgressRef.current);
+    }
+    if (callProgressRef2.current) {
+      clearTimeout(callProgressRef2.current);
+    }
+    
     // Simulate call progression
-    setTimeout(() => {
+    callProgressRef.current = setTimeout(() => {
       setCallStatus('ringing');
-      setTimeout(() => {
+      callProgressRef2.current = setTimeout(() => {
         setCallStatus('connected');
       }, 2000);
     }, 1000);
@@ -123,11 +236,82 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
     setIsCallActive(false);
     setCallStatus('idle');
     setTimer(0);
+    
+    // Clear call progress timeouts
+    if (callProgressRef.current) {
+      clearTimeout(callProgressRef.current);
+      callProgressRef.current = null;
+    }
+    if (callProgressRef2.current) {
+      clearTimeout(callProgressRef2.current);
+      callProgressRef2.current = null;
+    }
+  };
+
+  const handleSkipCaller = (): void => {
+    if (isCallActive) {
+      Alert.alert(
+        'Call Active',
+        'Please end the current call before skipping to the next caller.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (currentCallerIndex < CALLERS_DATA.length - 1) {
+      setCurrentCallerIndex(prev => prev + 1);
+      // Reset call-related states
+      setCallStatus('idle');
+      setTimer(0);
+      setFormData({
+        callPurpose: '',
+        callOutcome: '',
+        nextFollowUp: '',
+        remarks: '',
+        interested: false,
+        appointmentScheduled: false,
+      });
+    } else {
+      Alert.alert(
+        'No More Callers',
+        'You have reached the end of the caller list.',
+        [
+          { text: 'Close', onPress: onClose },
+          { text: 'Start Over', onPress: () => setCurrentCallerIndex(0) }
+        ]
+      );
+    }
+  };
+
+  const handlePreviousCaller = (): void => {
+    if (isCallActive) {
+      Alert.alert(
+        'Call Active',
+        'Please end the current call before changing callers.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (currentCallerIndex > 0) {
+      setCurrentCallerIndex(prev => prev - 1);
+      // Reset call-related states
+      setCallStatus('idle');
+      setTimer(0);
+      setFormData({
+        callPurpose: '',
+        callOutcome: '',
+        nextFollowUp: '',
+        remarks: '',
+        interested: false,
+        appointmentScheduled: false,
+      });
+    }
   };
 
   const handleFormSubmit = (): void => {
-    if (!formData.callPurpose || !formData.callOutcome) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!formData.callPurpose.trim() || !formData.callOutcome.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields (Call Purpose and Call Outcome)');
       return;
     }
     
@@ -159,6 +343,19 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
             setIsCallActive(false);
             setCallStatus('idle');
             setTimer(0);
+            // Clear all timers
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            if (callProgressRef.current) {
+              clearTimeout(callProgressRef.current);
+              callProgressRef.current = null;
+            }
+            if (callProgressRef2.current) {
+              clearTimeout(callProgressRef2.current);
+              callProgressRef2.current = null;
+            }
             onClose();
           }}
         ]
@@ -193,19 +390,52 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
     }
   };
 
-  const renderMainScreen = (): JSX.Element => (
+  const renderMainScreen = (): React.ReactElement => (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#f5f5f5" barStyle="dark-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Calling Interface</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Calling Interface</Text>
+          <Text style={styles.headerSubtitle}>
+            {currentCallerIndex + 1} of {CALLERS_DATA.length}
+          </Text>
+        </View>
         <TouchableOpacity onPress={handleCloseModal}>
           <Icon name="close" size={24} color="#333" />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Caller Navigation */}
+        <View style={styles.callerNavigation}>
+          <TouchableOpacity
+            style={[styles.navButton, currentCallerIndex === 0 && styles.navButtonDisabled]}
+            onPress={handlePreviousCaller}
+            disabled={currentCallerIndex === 0}
+          >
+            <Icon name="chevron-left" size={20} color={currentCallerIndex === 0 ? "#ccc" : "#666"} />
+            <Text style={[styles.navButtonText, currentCallerIndex === 0 && styles.navButtonTextDisabled]}>
+              Previous
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.callerCounter}>
+            <Text style={styles.counterText}>
+              Caller {currentCallerIndex + 1} of {CALLERS_DATA.length}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={handleSkipCaller}
+          >
+            <Text style={styles.navButtonText}>Skip</Text>
+            <Icon name="chevron-right" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+        
         {/* Call Button and Timer */}
         <View style={styles.callSection}>
           <TouchableOpacity
@@ -247,24 +477,24 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
             </View>
             
             <View style={styles.callerInfo}>
-              <Text style={styles.callerName}>{callerDetails.name}</Text>
+              <Text style={styles.callerName}>{currentCaller.name}</Text>
               <Text style={styles.callerTitle}>
-                {callerDetails.designation} at {callerDetails.company}
+                {currentCaller.designation} at {currentCaller.company}
               </Text>
               
               <View style={styles.contactRow}>
                 <Icon name="phone" size={16} color="#666" />
-                <Text style={styles.contactText}>{callerDetails.phone}</Text>
+                <Text style={styles.contactText}>{currentCaller.phone}</Text>
               </View>
               
               <View style={styles.contactRow}>
                 <Icon name="email" size={16} color="#666" />
-                <Text style={styles.contactText}>{callerDetails.email}</Text>
+                <Text style={styles.contactText}>{currentCaller.email}</Text>
               </View>
               
               <View style={styles.contactRow}>
                 <Icon name="location-on" size={16} color="#666" />
-                <Text style={styles.contactText}>{callerDetails.address}</Text>
+                <Text style={styles.contactText}>{currentCaller.address}</Text>
               </View>
             </View>
           </View>
@@ -282,7 +512,7 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
     </SafeAreaView>
   );
 
-  const renderForm = (): JSX.Element => (
+  const renderForm = (): React.ReactElement => (
     <Modal
       visible={showForm}
       animationType="slide"
@@ -311,6 +541,7 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
                 placeholder="What was the purpose of this call?"
                 multiline
                 numberOfLines={3}
+                textAlignVertical="top"
               />
             </View>
 
@@ -323,6 +554,7 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
                 placeholder="What was the outcome?"
                 multiline
                 numberOfLines={3}
+                textAlignVertical="top"
               />
             </View>
 
@@ -345,6 +577,7 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
                 placeholder="Additional remarks..."
                 multiline
                 numberOfLines={4}
+                textAlignVertical="top"
               />
             </View>
           </View>
@@ -428,14 +661,64 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  headerLeft: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
   content: {
     flex: 1,
     padding: 20,
+  },
+  callerNavigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  navButtonDisabled: {
+    backgroundColor: '#f9f9f9',
+  },
+  navButtonText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  navButtonTextDisabled: {
+    color: '#ccc',
+  },
+  callerCounter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  counterText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
   },
   callSection: {
     alignItems: 'center',

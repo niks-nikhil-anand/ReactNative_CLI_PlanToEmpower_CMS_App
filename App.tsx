@@ -10,8 +10,9 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import Homepage from './src/root/Homepage';
 import Sidebar from './src/root/shared/Drawer';
 import SignIn from './src/auth/SignIn';
+import AllCalls from './src/root/AllCalls';
 
-type ScreenType = 'SignIn' | 'Dashboard' | 'Users' | 'Settings' | 'Analytics' | 'Content';
+type ScreenType = 'SignIn' | 'Dashboard' | 'Calls' | 'Contacts' | 'Analytics' | 'Calendar' | 'Documents' | 'Settings' | 'Help';
 
 function App(): JSX.Element {
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(false);
@@ -35,6 +36,62 @@ function App(): JSX.Element {
     setActiveScreen('Dashboard');
   };
 
+  // Function to render the appropriate screen
+  const renderScreen = () => {
+    switch (activeScreen) {
+      case 'SignIn':
+        return <SignIn onLoginSuccess={handleLoginSuccess} />;
+      case 'Dashboard':
+        return <Homepage />;
+      case 'Calls':
+        return <AllCalls />;
+      case 'Contacts':
+        return (
+          <View style={styles.screenContainer}>
+            <Text style={styles.screenTitle}>Contacts</Text>
+            <Text style={styles.screenSubtitle}>Contacts page coming soon...</Text>
+          </View>
+        );
+      case 'Analytics':
+        return (
+          <View style={styles.screenContainer}>
+            <Text style={styles.screenTitle}>Analytics</Text>
+            <Text style={styles.screenSubtitle}>Analytics page coming soon...</Text>
+          </View>
+        );
+      case 'Calendar':
+        return (
+          <View style={styles.screenContainer}>
+            <Text style={styles.screenTitle}>Calendar</Text>
+            <Text style={styles.screenSubtitle}>Calendar page coming soon...</Text>
+          </View>
+        );
+      case 'Documents':
+        return (
+          <View style={styles.screenContainer}>
+            <Text style={styles.screenTitle}>Documents</Text>
+            <Text style={styles.screenSubtitle}>Documents page coming soon...</Text>
+          </View>
+        );
+      case 'Settings':
+        return (
+          <View style={styles.screenContainer}>
+            <Text style={styles.screenTitle}>Settings</Text>
+            <Text style={styles.screenSubtitle}>Settings page coming soon...</Text>
+          </View>
+        );
+      case 'Help':
+        return (
+          <View style={styles.screenContainer}>
+            <Text style={styles.screenTitle}>Help & Support</Text>
+            <Text style={styles.screenSubtitle}>Help page coming soon...</Text>
+          </View>
+        );
+      default:
+        return <Homepage />;
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Show header only when logged in */}
@@ -55,12 +112,8 @@ function App(): JSX.Element {
         </View>
       )}
 
-      {/* Conditional Screens */}
-      {activeScreen === 'SignIn' ? (
-        <SignIn onLoginSuccess={handleLoginSuccess} />
-      ) : (
-        <Homepage />
-      )}
+      {/* Render the appropriate screen */}
+      {renderScreen()}
 
       {/* Sidebar visible only after login */}
       {activeScreen !== 'SignIn' && (
@@ -111,6 +164,23 @@ const styles = StyleSheet.create({
   headerIcon: { 
     padding: 8, 
     marginLeft: 8 
+  },
+  screenContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  screenSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

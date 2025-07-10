@@ -131,14 +131,6 @@ const Homepage: React.FC = () => {
       <CallingInterface
         visible={showCallingInterface}
         onClose={handleCloseCalling}
-        callerDetails={{
-          name: 'Jane Smith',
-          phone: '+1 (555) 987-6543',
-          company: 'Tech Solutions Inc.',
-          designation: 'Senior Developer',
-          email: 'jane.smith@techsolutions.com',
-          address: '456 Innovation Drive, Tech City, TC 67890',
-        }}
       />
     </>
   );
