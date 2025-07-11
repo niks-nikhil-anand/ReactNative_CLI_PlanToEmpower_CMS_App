@@ -97,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       console.log('Retrieved token:', token);
 
       // Make API call to /api/candidate/me with token in Authorization header
-      const response = await fetch(`http://10.171.189.32:3000/api/auth/candidate/me`, {
+      const response = await fetch(`https://cms-nextjs-blue.vercel.app/api/auth/candidate/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -37,7 +37,7 @@ export default function SignIn({ onLoginSuccess }: SignInProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://10.171.189.32:3000/api/auth/candidate/login', {
+      const response = await fetch('https://cms-nextjs-blue.vercel.app/api/auth/candidate/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
