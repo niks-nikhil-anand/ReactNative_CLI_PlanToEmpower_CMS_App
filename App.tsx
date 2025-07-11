@@ -1,6 +1,7 @@
-import React, { JSX, useState } from 'react';
+import React, { JSX, useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SignIn from './src/auth/SignIn';
 import Homepage from './src/root/Homepage';
 import AllCalls from './src/root/AllCalls';
@@ -28,13 +29,39 @@ function App(): JSX.Element {
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(false);
   const [activeScreen, setActiveScreen] = useState<ScreenType>('SignIn');
   const [previousScreen, setPreviousScreen] = useState<ScreenType>('Dashboard');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Check for token on app start
+  useEffect(() => {
+    checkAuthToken();
+  }, []);
+
+  const checkAuthToken = async (): Promise<void> => {
+    try {
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem('token');
+      
+      if (token) {
+        // Token exists, navigate to dashboard
+        setActiveScreen('Dashboard');
+      } else {
+        // No token, stay on SignIn
+        setActiveScreen('SignIn');
+      }
+    } catch (error) {
+      console.error('Error checking token:', error);
+      // If there's an error, default to SignIn
+      setActiveScreen('SignIn');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleSidebar = (): void => setSidebarVisible(!sidebarVisible);
 
   const handleScreenChange = (screen: string): void => {
     if (screen === 'Logout') {
-      setActiveScreen('SignIn');
-      setSidebarVisible(false);
+      handleLogout();
       return;
     }
 
@@ -45,6 +72,18 @@ function App(): JSX.Element {
 
   const handleLoginSuccess = (): void => {
     setActiveScreen('Dashboard');
+  };
+
+  const handleLogout = async (): Promise<void> => {
+    try {
+      // Remove token from AsyncStorage
+      await AsyncStorage.removeItem('token');
+      setActiveScreen('SignIn');
+      setSidebarVisible(false);
+      console.log('User logged out successfully');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   };
 
   const handleNotificationClick = (): void => {
@@ -92,6 +131,15 @@ function App(): JSX.Element {
         return <Homepage />;
     }
   };
+
+  // Show loading screen while checking token
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -196,6 +244,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#666',
   },
 });
 

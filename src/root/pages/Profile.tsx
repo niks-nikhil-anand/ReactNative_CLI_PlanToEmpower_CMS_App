@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,9 @@ import {
   Alert,
   Dimensions,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProfileData {
   fullName: string;
@@ -18,6 +20,12 @@ interface ProfileData {
   mobile: string;
   status: string;
   profilePicture: string;
+}
+
+interface UserData {
+  id: string;
+  name: string;
+  role: string;
 }
 
 interface ProfilePageProps {
@@ -29,43 +37,173 @@ interface ProfilePageProps {
 const ProfilePage: React.FC<ProfilePageProps> = ({
   initialData,
   onSave,
-  onEditPhoto
+  onEditPhoto,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<UserData>({
+    id: '',
+    name: 'Unknown User',
+    role: 'Unknown Role',
+  });
+
   const [profileData, setProfileData] = useState<ProfileData>(
     initialData || {
       fullName: 'John Doe',
       email: 'john.doe@example.com',
       mobile: '+1 (555) 123-4567',
       status: 'Available',
-      profilePicture: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face'
-    }
+      profilePicture:
+        'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face',
+    },
   );
 
   const [editData, setEditData] = useState<ProfileData>(profileData);
 
-  const statusOptions = ['Available', 'Busy', 'Away', 'Do Not Disturb', 'Offline'];
+  const statusOptions = [
+    'Available',
+    'Busy',
+    'Away',
+    'Do Not Disturb',
+    'Offline',
+  ];
 
-  const handleSave = () => {
+  // Fetch user data from API
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem('token');
+
+      if (!token) {
+        console.log('No token found in AsyncStorage');
+        Alert.alert('Error', 'Session expired. Please login again.');
+        return;
+      }
+
+      console.log('Retrieved token:', token);
+
+      // Make API call to /api/candidate/me with token in Authorization header
+      const response = await fetch(
+        `http://10.171.189.32:3000/api/auth/candidate/me`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const userData = await response.json();
+      console.log('User data fetched:', userData);
+      console.log('User data fetched:', userData.data._id);
+
+      // Update user data state
+      setUserData({
+        id: userData.data._id || '',
+        name: userData.data.fullName || 'Unknown User',
+        role: userData.data.role || 'Unknown Role',
+      });
+
+      // Update profile data with API response
+      const updatedProfileData = {
+        fullName: userData.data.fullName || 'John Doe',
+        email: userData.data.email || 'john.doe@example.com',
+        mobile:
+          userData.data.mobile || userData.data.phone || '+1 (555) 123-4567',
+        status: userData.data.status || 'Available',
+        profilePicture:
+          userData.data.profilePicture ||
+          userData.data.avatar ||
+          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face',
+      };
+
+      setProfileData(updatedProfileData);
+      setEditData(updatedProfileData);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      Alert.alert('Error', 'Failed to load user data. Please try again.');
+
+      // Set fallback data
+      setUserData({
+        id: '',
+        name: 'Unknown User',
+        role: 'Unknown Role',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch user data on component mount
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const handleSave = async () => {
     if (!editData.fullName.trim()) {
       Alert.alert('Error', 'Full name is required');
       return;
     }
-    
+
     if (!editData.email.trim() || !isValidEmail(editData.email)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
-    
+
     if (!editData.mobile.trim()) {
       Alert.alert('Error', 'Mobile number is required');
       return;
     }
 
-    setProfileData(editData);
-    setIsEditing(false);
-    onSave?.(editData);
-    Alert.alert('Success', 'Profile updated successfully');
+    try {
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem('token');
+
+      if (!token) {
+        Alert.alert('Error', 'Session expired. Please login again.');
+        return;
+      }
+
+      // Make API call to update profile
+      const response = await fetch(
+        `http://10.171.189.32:3000/api/auth/candidate/update`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fullName: editData.fullName,
+            email: editData.email,
+            mobile: editData.mobile,
+            status: editData.status,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Profile updated:', result);
+
+      setProfileData(editData);
+      setIsEditing(false);
+      onSave?.(editData);
+      Alert.alert('Success', 'Profile updated successfully');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    }
   };
 
   const handleCancel = () => {
@@ -80,12 +218,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'Available': return '#4caf50';
-      case 'Busy': return '#f44336';
-      case 'Away': return '#ff9800';
-      case 'Do Not Disturb': return '#9c27b0';
-      case 'Offline': return '#9e9e9e';
-      default: return '#4caf50';
+      case 'Available':
+        return '#4caf50';
+      case 'Busy':
+        return '#f44336';
+      case 'Away':
+        return '#ff9800';
+      case 'Do Not Disturb':
+        return '#9c27b0';
+      case 'Offline':
+        return '#9e9e9e';
+      default:
+        return '#4caf50';
     }
   };
 
@@ -95,12 +239,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         source={{ uri: profileData.profilePicture }}
         style={styles.profilePicture}
       />
-      <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(profileData.status) }]} />
+      <View
+        style={[
+          styles.statusIndicator,
+          { backgroundColor: getStatusColor(profileData.status) },
+        ]}
+      />
       {isEditing && (
-        <TouchableOpacity 
-          style={styles.editPhotoButton}
-          onPress={onEditPhoto}
-        >
+        <TouchableOpacity style={styles.editPhotoButton} onPress={onEditPhoto}>
           <Text style={styles.editPhotoText}>📷</Text>
         </TouchableOpacity>
       )}
@@ -112,7 +258,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     value: string,
     key: keyof ProfileData,
     multiline: boolean = false,
-    keyboardType: 'default' | 'email-address' | 'phone-pad' = 'default'
+    keyboardType: 'default' | 'email-address' | 'phone-pad' = 'default',
   ) => (
     <View style={styles.fieldContainer}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -120,7 +266,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <TextInput
           style={[styles.input, multiline && styles.multilineInput]}
           value={editData[key]}
-          onChangeText={(text) => setEditData({ ...editData, [key]: text })}
+          onChangeText={text => setEditData({ ...editData, [key]: text })}
           placeholder={`Enter ${label.toLowerCase()}`}
           placeholderTextColor="#999"
           multiline={multiline}
@@ -137,20 +283,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       <Text style={styles.fieldLabel}>Status</Text>
       {isEditing ? (
         <View style={styles.statusContainer}>
-          {statusOptions.map((status) => (
+          {statusOptions.map(status => (
             <TouchableOpacity
               key={status}
               style={[
                 styles.statusOption,
-                editData.status === status && styles.selectedStatus
+                editData.status === status && styles.selectedStatus,
               ]}
               onPress={() => setEditData({ ...editData, status })}
             >
-              <View style={[styles.statusDot, { backgroundColor: getStatusColor(status) }]} />
-              <Text style={[
-                styles.statusText,
-                editData.status === status && styles.selectedStatusText
-              ]}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: getStatusColor(status) },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.statusText,
+                  editData.status === status && styles.selectedStatusText,
+                ]}
+              >
                 {status}
               </Text>
             </TouchableOpacity>
@@ -158,45 +311,112 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         </View>
       ) : (
         <View style={styles.statusDisplay}>
-          <View style={[styles.statusDot, { backgroundColor: getStatusColor(profileData.status) }]} />
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: getStatusColor(profileData.status) },
+            ]}
+          />
           <Text style={styles.fieldValue}>{profileData.status}</Text>
         </View>
       )}
     </View>
   );
 
+  const renderRoleField = () => (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>Role</Text>
+      <Text style={styles.fieldValue}>{userData.role}</Text>
+    </View>
+  );
+
+  const renderUserIdField = () => (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>User ID</Text>
+      <Text style={styles.fieldValue}>{userData.id}</Text>
+    </View>
+  );
+
+  // Show loading indicator while fetching data
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4a90e2" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4a90e2" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Picture Section */}
         <View style={styles.profileSection}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => setIsEditing(!isEditing)}
+          >
+            <Text style={styles.editButtonText}>
+              {isEditing ? 'Cancel' : 'Edit'}
+            </Text>
+          </TouchableOpacity>
+
           {renderProfilePicture()}
           <Text style={styles.profileName}>{profileData.fullName}</Text>
           <Text style={styles.profileEmail}>{profileData.email}</Text>
+          <Text style={styles.profileRole}>{userData.role}</Text>
         </View>
 
         {/* Profile Details */}
         <View style={styles.detailsContainer}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
-          
+
           {renderField('Full Name', profileData.fullName, 'fullName')}
-          {renderField('Email Address', profileData.email, 'email', false, 'email-address')}
-          {renderField('Mobile Number', profileData.mobile, 'mobile', false, 'phone-pad')}
+          {renderField(
+            'Email Address',
+            profileData.email,
+            'email',
+            false,
+            'email-address',
+          )}
+          {renderField(
+            'Mobile Number',
+            profileData.mobile,
+            'mobile',
+            false,
+            'phone-pad',
+          )}
           {renderStatusField()}
+          {renderRoleField()}
+          {renderUserIdField()}
         </View>
 
         {/* Action Buttons */}
         {isEditing && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSave}
-            >
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
               <Text style={styles.saveButtonText}>Save Changes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleCancel}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Refresh Button */}
+        <View style={styles.refreshContainer}>
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={fetchUserData}
+          >
+            <Text style={styles.refreshButtonText}>🔄 Refresh Profile</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -209,48 +429,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#4a90e2',
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: '#f8f9fa',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  editButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-  },
-  editButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666666',
   },
   content: {
     flex: 1,
+    paddingTop: 20,
   },
   profileSection: {
     alignItems: 'center',
     backgroundColor: '#ffffff',
     paddingVertical: 30,
+    paddingHorizontal: 20,
+    marginHorizontal: 16,
     marginBottom: 20,
+    borderRadius: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    position: 'relative',
+  },
+  editButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#4a90e2',
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  editButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   profilePictureContainer: {
     position: 'relative',
@@ -302,12 +528,23 @@ const styles = StyleSheet.create({
   profileEmail: {
     fontSize: 16,
     color: '#666666',
+    marginBottom: 8,
+  },
+  profileRole: {
+    fontSize: 14,
+    color: '#4a90e2',
+    fontWeight: '600',
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   detailsContainer: {
     backgroundColor: '#ffffff',
     padding: 20,
     marginHorizontal: 16,
-    borderRadius: 12,
+    marginBottom: 20,
+    borderRadius: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -394,7 +631,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionButtons: {
-    padding: 20,
+    paddingHorizontal: 16,
+    marginBottom: 20,
   },
   saveButton: {
     backgroundColor: '#4a90e2',
@@ -406,12 +644,52 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
+    marginBottom: 12,
   },
   saveButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
+  cancelButton: {
+    backgroundColor: '#f44336',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  cancelButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  refreshContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    marginBottom: 16,
+  },
+  refreshButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  refreshButtonText: {
+    color: '#4a90e2',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
-export default ProfilePage
+export default ProfilePage;
