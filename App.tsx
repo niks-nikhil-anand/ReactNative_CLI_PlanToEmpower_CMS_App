@@ -1,22 +1,33 @@
 import React, { JSX, useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-
-import Homepage from './src/root/Homepage';
-import Sidebar from './src/root/shared/Drawer';
 import SignIn from './src/auth/SignIn';
+import Homepage from './src/root/Homepage';
 import AllCalls from './src/root/AllCalls';
+import Sidebar from './src/root/shared/Drawer';
+import Calendar from './src/root/pages/Calender';
+import ProfilePage from './src/root/pages/Profile';
+import HelpSupport from './src/root/pages/HelpSupport';
+import SettingsPage from './src/root/pages/Settings';
+import Analytics from './src/root/pages/Analytics';
+import NotificationsPage from './src/root/pages/Notification';
 
-type ScreenType = 'SignIn' | 'Dashboard' | 'Calls' | 'Contacts' | 'Analytics' | 'Calendar' | 'Documents' | 'Settings' | 'Help';
+type ScreenType =
+  | 'SignIn'
+  | 'Dashboard'
+  | 'Calls'
+  | 'Contacts'
+  | 'Analytics'
+  | 'Calendar'
+  | 'Profile'
+  | 'Settings'
+  | 'Help'
+  | 'Notifications';
 
 function App(): JSX.Element {
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(false);
   const [activeScreen, setActiveScreen] = useState<ScreenType>('SignIn');
+  const [previousScreen, setPreviousScreen] = useState<ScreenType>('Dashboard');
 
   const toggleSidebar = (): void => setSidebarVisible(!sidebarVisible);
 
@@ -36,6 +47,17 @@ function App(): JSX.Element {
     setActiveScreen('Dashboard');
   };
 
+  const handleNotificationClick = (): void => {
+    if (activeScreen === 'Notifications') {
+      // If already on notifications page, go back to previous screen
+      setActiveScreen(previousScreen);
+    } else {
+      // If not on notifications page, store current screen and go to notifications
+      setPreviousScreen(activeScreen);
+      setActiveScreen('Notifications');
+    }
+  };
+
   // Function to render the appropriate screen
   const renderScreen = () => {
     switch (activeScreen) {
@@ -49,44 +71,23 @@ function App(): JSX.Element {
         return (
           <View style={styles.screenContainer}>
             <Text style={styles.screenTitle}>Contacts</Text>
-            <Text style={styles.screenSubtitle}>Contacts page coming soon...</Text>
+            <Text style={styles.screenSubtitle}>
+              Contacts page coming soon...
+            </Text>
           </View>
         );
       case 'Analytics':
-        return (
-          <View style={styles.screenContainer}>
-            <Text style={styles.screenTitle}>Analytics</Text>
-            <Text style={styles.screenSubtitle}>Analytics page coming soon...</Text>
-          </View>
-        );
+        return <Analytics />;
       case 'Calendar':
-        return (
-          <View style={styles.screenContainer}>
-            <Text style={styles.screenTitle}>Calendar</Text>
-            <Text style={styles.screenSubtitle}>Calendar page coming soon...</Text>
-          </View>
-        );
-      case 'Documents':
-        return (
-          <View style={styles.screenContainer}>
-            <Text style={styles.screenTitle}>Documents</Text>
-            <Text style={styles.screenSubtitle}>Documents page coming soon...</Text>
-          </View>
-        );
+        return <Calendar />;
+      case 'Profile':
+        return <ProfilePage />;
       case 'Settings':
-        return (
-          <View style={styles.screenContainer}>
-            <Text style={styles.screenTitle}>Settings</Text>
-            <Text style={styles.screenSubtitle}>Settings page coming soon...</Text>
-          </View>
-        );
+        return <SettingsPage />;
       case 'Help':
-        return (
-          <View style={styles.screenContainer}>
-            <Text style={styles.screenTitle}>Help & Support</Text>
-            <Text style={styles.screenSubtitle}>Help page coming soon...</Text>
-          </View>
-        );
+        return <HelpSupport />;
+      case 'Notifications':
+        return <NotificationsPage />;
       default:
         return <Homepage />;
     }
@@ -102,8 +103,18 @@ function App(): JSX.Element {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{activeScreen}</Text>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.headerIcon}>
-              <Icon name="notifications" size={24} color="#333" />
+            <TouchableOpacity 
+              style={[
+                styles.headerIcon, 
+                activeScreen === 'Notifications' && styles.activeNotificationIcon
+              ]} 
+              onPress={handleNotificationClick}
+            >
+              <Icon 
+                name="notifications" 
+                size={24} 
+                color={activeScreen === 'Notifications' ? '#007AFF' : '#333'} 
+              />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerIcon}>
               <Icon name="search" size={24} color="#333" />
@@ -129,9 +140,9 @@ function App(): JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#f5f5f5' 
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
@@ -148,8 +159,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  menuButton: { 
-    padding: 8 
+  menuButton: {
+    padding: 8,
   },
   headerTitle: {
     fontSize: 20,
@@ -158,12 +169,16 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  headerRight: { 
-    flexDirection: 'row' 
+  headerRight: {
+    flexDirection: 'row',
   },
-  headerIcon: { 
-    padding: 8, 
-    marginLeft: 8 
+  headerIcon: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  activeNotificationIcon: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 20,
   },
   screenContainer: {
     flex: 1,

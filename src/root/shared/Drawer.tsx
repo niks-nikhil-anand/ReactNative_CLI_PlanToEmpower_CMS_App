@@ -253,9 +253,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               <SidebarItem
                 icon="folder"
                 iconLibrary="Feather"
-                title="Documents"
-                onPress={() => handleItemPress('Documents')}
-                isActive={activeScreen === 'Documents'}
+                title="Profile"
+                onPress={() => handleItemPress('Profile')}
+                isActive={activeScreen === 'Profile'}
               />
 
               <View style={styles.divider} />
