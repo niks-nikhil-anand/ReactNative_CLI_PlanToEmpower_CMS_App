@@ -274,7 +274,11 @@ const NotificationsPage: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
         {filteredNotifications.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>📭</Text>
@@ -286,7 +290,7 @@ const NotificationsPage: React.FC = () => {
             </Text>
           </View>
         ) : (
-          filteredNotifications.map(notification => (
+          filteredNotifications.map((notification, index) => (
             <NotificationCard
               key={notification.id}
               notification={notification}
@@ -362,12 +366,15 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
     paddingTop: 10,
+    paddingBottom: 30, // Added bottom padding to scroll view content
   },
   notificationCard: {
     backgroundColor: '#fff',
     marginHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 12, // Increased from 8 to 12 for better spacing
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: {
@@ -440,6 +447,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
     paddingHorizontal: 40,
+    marginBottom: 30, // Added bottom margin to empty state
   },
   emptyStateIcon: {
     fontSize: 48,

@@ -5,14 +5,15 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TextInput,
   ScrollView,
   Dimensions,
   Alert,
   StatusBar,
   SafeAreaView,
+  Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import CallConnectionForm from './CallDetailsForm';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,13 +26,17 @@ interface CallerDetails {
   address: string;
 }
 
-interface CallFormData {
-  callPurpose: string;
-  callOutcome: string;
-  nextFollowUp: string;
-  remarks: string;
-  interested: boolean;
-  appointmentScheduled: boolean;
+interface PreviousCallData {
+  id: string;
+  callDate: string;
+  callTime: string;
+  duration: string;
+  callType: 'incoming' | 'outgoing' | 'missed';
+  status: 'completed' | 'no_answer' | 'busy' | 'cancelled';
+  notes: string;
+  outcome: 'interested' | 'not_interested' | 'callback' | 'no_response';
+  followUpDate?: string;
+  recordingUrl?: string;
 }
 
 interface CallingInterfaceProps {
@@ -107,6 +112,155 @@ const CALLERS_DATA: CallerDetails[] = [
   },
 ];
 
+// Demo previous call data for each candidate
+const PREVIOUS_CALLS_DATA: { [key: string]: PreviousCallData[] } = {
+  'John Doe': [
+    {
+      id: '1',
+      callDate: '2024-01-15',
+      callTime: '10:30 AM',
+      duration: '8:45',
+      callType: 'outgoing',
+      status: 'completed',
+      notes: 'Discussed project requirements and timeline. Client showed interest in our services.',
+      outcome: 'interested',
+      followUpDate: '2024-01-20',
+    },
+    {
+      id: '2',
+      callDate: '2024-01-08',
+      callTime: '2:15 PM',
+      duration: '3:22',
+      callType: 'incoming',
+      status: 'completed',
+      notes: 'Initial inquiry about our products. Requested product demo.',
+      outcome: 'callback',
+      followUpDate: '2024-01-10',
+    },
+    {
+      id: '3',
+      callDate: '2024-01-03',
+      callTime: '11:00 AM',
+      duration: '0:00',
+      callType: 'outgoing',
+      status: 'no_answer',
+      notes: 'No response. Left voicemail.',
+      outcome: 'no_response',
+      followUpDate: '2024-01-05',
+    },
+  ],
+  'Jane Smith': [
+    {
+      id: '4',
+      callDate: '2024-01-12',
+      callTime: '3:45 PM',
+      duration: '12:30',
+      callType: 'outgoing',
+      status: 'completed',
+      notes: 'Technical discussion about system integration. Very positive response.',
+      outcome: 'interested',
+      followUpDate: '2024-01-18',
+    },
+    {
+      id: '5',
+      callDate: '2024-01-05',
+      callTime: '9:20 AM',
+      duration: '5:15',
+      callType: 'incoming',
+      status: 'completed',
+      notes: 'Asked about pricing and implementation timeline.',
+      outcome: 'callback',
+    },
+  ],
+  'Michael Johnson': [
+    {
+      id: '6',
+      callDate: '2024-01-14',
+      callTime: '1:30 PM',
+      duration: '6:45',
+      callType: 'outgoing',
+      status: 'completed',
+      notes: 'Marketing strategy discussion. Interested in our digital marketing services.',
+      outcome: 'interested',
+      followUpDate: '2024-01-21',
+    },
+  ],
+  'Sarah Williams': [
+    {
+      id: '7',
+      callDate: '2024-01-11',
+      callTime: '4:00 PM',
+      duration: '2:15',
+      callType: 'outgoing',
+      status: 'completed',
+      notes: 'Brief call about data analytics tools. Not the right fit currently.',
+      outcome: 'not_interested',
+    },
+    {
+      id: '8',
+      callDate: '2024-01-07',
+      callTime: '10:15 AM',
+      duration: '0:00',
+      callType: 'outgoing',
+      status: 'busy',
+      notes: 'Line was busy. Will try again later.',
+      outcome: 'no_response',
+      followUpDate: '2024-01-09',
+    },
+  ],
+  'Robert Brown': [
+    {
+      id: '9',
+      callDate: '2024-01-13',
+      callTime: '11:45 AM',
+      duration: '15:20',
+      callType: 'incoming',
+      status: 'completed',
+      notes: 'Executive level discussion about enterprise solutions. Very interested in partnership.',
+      outcome: 'interested',
+      followUpDate: '2024-01-20',
+    },
+    {
+      id: '10',
+      callDate: '2024-01-06',
+      callTime: '3:30 PM',
+      duration: '7:45',
+      callType: 'outgoing',
+      status: 'completed',
+      notes: 'Initial business development call. Good rapport established.',
+      outcome: 'callback',
+      followUpDate: '2024-01-10',
+    },
+  ],
+  'Emily Davis': [
+    {
+      id: '11',
+      callDate: '2024-01-10',
+      callTime: '2:20 PM',
+      duration: '4:30',
+      callType: 'outgoing',
+      status: 'completed',
+      notes: 'Creative project discussion. Interested in our design services.',
+      outcome: 'interested',
+      followUpDate: '2024-01-17',
+    },
+  ],
+  'David Wilson': [],
+  'Lisa Thompson': [
+    {
+      id: '12',
+      callDate: '2024-01-09',
+      callTime: '9:45 AM',
+      duration: '8:15',
+      callType: 'incoming',
+      status: 'completed',
+      notes: 'Healthcare solution inquiry. Discussed compliance requirements.',
+      outcome: 'callback',
+      followUpDate: '2024-01-15',
+    },
+  ],
+};
+
 type CallStatus = 'idle' | 'dialing' | 'ringing' | 'connected';
 
 const CallingInterface: React.FC<CallingInterfaceProps> = ({
@@ -115,18 +269,12 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   callerDetails,
 }) => {
   const [currentCallerIndex, setCurrentCallerIndex] = useState<number>(0);
-  const [isCallActive, setIsCallActive] = useState<boolean>(false);
   const [timer, setTimer] = useState<number>(0);
   const [showForm, setShowForm] = useState<boolean>(false);
+  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
+  const [isCallActive, setIsCallActive] = useState<boolean>(false);
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
-  const [formData, setFormData] = useState<CallFormData>({
-    callPurpose: '',
-    callOutcome: '',
-    nextFollowUp: '',
-    remarks: '',
-    interested: false,
-    appointmentScheduled: false,
-  });
+  const [expandedCallId, setExpandedCallId] = useState<string | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const callProgressRef = useRef<NodeJS.Timeout | null>(null);
@@ -134,14 +282,19 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   
   // Get current caller details
   const currentCaller = callerDetails || CALLERS_DATA[currentCallerIndex];
+  
+  // Get previous calls for current caller
+  const previousCalls = PREVIOUS_CALLS_DATA[currentCaller.name] || [];
 
-  // Timer effect
+  // Timer effect - starts when interface opens for each caller
   useEffect(() => {
-    if (isCallActive) {
+    if (visible && !showForm) {
+      setIsTimerRunning(true);
       timerRef.current = setInterval(() => {
         setTimer(prev => prev + 1);
       }, 1000);
     } else {
+      setIsTimerRunning(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -154,30 +307,26 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
         timerRef.current = null;
       }
     };
-  }, [isCallActive]);
+  }, [visible, showForm, currentCallerIndex]);
 
   // Reset state when modal closes
   useEffect(() => {
     if (!visible) {
       setCurrentCallerIndex(0);
-      setIsCallActive(false);
-      setCallStatus('idle');
       setTimer(0);
       setShowForm(false);
-      setFormData({
-        callPurpose: '',
-        callOutcome: '',
-        nextFollowUp: '',
-        remarks: '',
-        interested: false,
-        appointmentScheduled: false,
-      });
+      setIsTimerRunning(false);
+      setIsCallActive(false);
+      setCallStatus('idle');
+      setExpandedCallId(null);
       
-      // Clear all timers
+      // Clear timer
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      
+      // Clear call progress timeouts
       if (callProgressRef.current) {
         clearTimeout(callProgressRef.current);
         callProgressRef.current = null;
@@ -211,17 +360,21 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   };
 
   const handleStartCall = (): void => {
+    // Extract phone number and remove formatting
+    const phoneNumber = currentCaller.phone.replace(/[^\d+]/g, '');
+    
+    // Create tel: URL for dialer
+    const telUrl = `tel:${phoneNumber}`;
+    
+    // Open native dialer
+    Linking.openURL(telUrl).catch(err => {
+      Alert.alert('Error', 'Unable to open dialer. Please check if your device supports phone calls.');
+      console.error('Error opening dialer:', err);
+    });
+
+    // Simulate call progress
     setIsCallActive(true);
     setCallStatus('dialing');
-    setTimer(0);
-    
-    // Clear any existing timeouts
-    if (callProgressRef.current) {
-      clearTimeout(callProgressRef.current);
-    }
-    if (callProgressRef2.current) {
-      clearTimeout(callProgressRef2.current);
-    }
     
     // Simulate call progression
     callProgressRef.current = setTimeout(() => {
@@ -235,7 +388,6 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   const handleEndCall = (): void => {
     setIsCallActive(false);
     setCallStatus('idle');
-    setTimer(0);
     
     // Clear call progress timeouts
     if (callProgressRef.current) {
@@ -249,135 +401,95 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
   };
 
   const handleSkipCaller = (): void => {
-    if (isCallActive) {
-      Alert.alert(
-        'Call Active',
-        'Please end the current call before skipping to the next caller.',
-        [{ text: 'OK' }]
-      );
-      return;
+    // Stop timer and reset for next caller
+    setIsTimerRunning(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
+
+    // End any active call
+    handleEndCall();
+
+    // Reset expanded call
+    setExpandedCallId(null);
 
     if (currentCallerIndex < CALLERS_DATA.length - 1) {
       setCurrentCallerIndex(prev => prev + 1);
-      // Reset call-related states
-      setCallStatus('idle');
-      setTimer(0);
-      setFormData({
-        callPurpose: '',
-        callOutcome: '',
-        nextFollowUp: '',
-        remarks: '',
-        interested: false,
-        appointmentScheduled: false,
-      });
+      setTimer(0); // Reset timer for next caller
     } else {
       Alert.alert(
         'No More Callers',
         'You have reached the end of the caller list.',
         [
           { text: 'Close', onPress: onClose },
-          { text: 'Start Over', onPress: () => setCurrentCallerIndex(0) }
+          { text: 'Start Over', onPress: () => {
+            setCurrentCallerIndex(0);
+            setTimer(0);
+          }}
         ]
       );
     }
   };
 
   const handlePreviousCaller = (): void => {
-    if (isCallActive) {
-      Alert.alert(
-        'Call Active',
-        'Please end the current call before changing callers.',
-        [{ text: 'OK' }]
-      );
-      return;
+    // Stop timer and reset for previous caller
+    setIsTimerRunning(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
+
+    // End any active call
+    handleEndCall();
+
+    // Reset expanded call
+    setExpandedCallId(null);
 
     if (currentCallerIndex > 0) {
       setCurrentCallerIndex(prev => prev - 1);
-      // Reset call-related states
-      setCallStatus('idle');
-      setTimer(0);
-      setFormData({
-        callPurpose: '',
-        callOutcome: '',
-        nextFollowUp: '',
-        remarks: '',
-        interested: false,
-        appointmentScheduled: false,
-      });
+      setTimer(0); // Reset timer for previous caller
     }
   };
 
-  const handleFormSubmit = (): void => {
-    if (!formData.callPurpose.trim() || !formData.callOutcome.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields (Call Purpose and Call Outcome)');
-      return;
+  const handleFormSubmit = (formData: any): void => {
+    console.log('Form submitted:', formData);
+    
+    // Stop timer when form is submitted
+    setIsTimerRunning(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
     
-    console.log('Form submitted:', formData);
     Alert.alert('Success', 'Call details saved successfully!', [
       { text: 'OK', onPress: () => {
         setShowForm(false);
-        setFormData({
-          callPurpose: '',
-          callOutcome: '',
-          nextFollowUp: '',
-          remarks: '',
-          interested: false,
-          appointmentScheduled: false,
-        });
+        setTimer(0); // Reset timer
         onClose(); // Close the main modal after saving
       }}
     ]);
   };
 
+  const handleFormClose = (): void => {
+    setShowForm(false);
+  };
+
   const handleCloseModal = (): void => {
-    if (isCallActive) {
-      Alert.alert(
-        'Call Active',
-        'You have an active call. Are you sure you want to close?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Yes', onPress: () => {
-            setIsCallActive(false);
-            setCallStatus('idle');
-            setTimer(0);
-            // Clear all timers
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
-            }
-            if (callProgressRef.current) {
-              clearTimeout(callProgressRef.current);
-              callProgressRef.current = null;
-            }
-            if (callProgressRef2.current) {
-              clearTimeout(callProgressRef2.current);
-              callProgressRef2.current = null;
-            }
-            onClose();
-          }}
-        ]
-      );
-    } else {
-      onClose();
+    // Stop timer when closing
+    setIsTimerRunning(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
+    
+    // End any active call
+    handleEndCall();
+    
+    onClose();
   };
 
-  const getStatusColor = (): string => {
-    switch (callStatus) {
-      case 'dialing':
-      case 'ringing':
-        return '#FF9800';
-      case 'connected':
-        return '#4CAF50';
-      default:
-        return '#666';
-    }
-  };
-
-  const getStatusText = (): string => {
+  const getCallStatusText = (): string => {
     switch (callStatus) {
       case 'dialing':
         return 'Dialing...';
@@ -390,244 +502,78 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
     }
   };
 
-  const renderMainScreen = (): React.ReactElement => (
-    <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#f5f5f5" barStyle="dark-content" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Calling Interface</Text>
-          <Text style={styles.headerSubtitle}>
-            {currentCallerIndex + 1} of {CALLERS_DATA.length}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={handleCloseModal}>
-          <Icon name="close" size={24} color="#333" />
-        </TouchableOpacity>
-      </View>
+  const getCallStatusColor = (): string => {
+    switch (callStatus) {
+      case 'dialing':
+        return '#FF9800';
+      case 'ringing':
+        return '#2196F3';
+      case 'connected':
+        return '#4CAF50';
+      default:
+        return '#666';
+    }
+  };
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Caller Navigation */}
-        <View style={styles.callerNavigation}>
-          <TouchableOpacity
-            style={[styles.navButton, currentCallerIndex === 0 && styles.navButtonDisabled]}
-            onPress={handlePreviousCaller}
-            disabled={currentCallerIndex === 0}
-          >
-            <Icon name="chevron-left" size={20} color={currentCallerIndex === 0 ? "#ccc" : "#666"} />
-            <Text style={[styles.navButtonText, currentCallerIndex === 0 && styles.navButtonTextDisabled]}>
-              Previous
-            </Text>
-          </TouchableOpacity>
+  const getCallTypeIcon = (callType: string): string => {
+    switch (callType) {
+      case 'incoming':
+        return 'call-received';
+      case 'outgoing':
+        return 'call-made';
+      case 'missed':
+        return 'call-missed';
+      default:
+        return 'call';
+    }
+  };
 
-          <View style={styles.callerCounter}>
-            <Text style={styles.counterText}>
-              Caller {currentCallerIndex + 1} of {CALLERS_DATA.length}
-            </Text>
-          </View>
+  const getCallTypeColor = (callType: string): string => {
+    switch (callType) {
+      case 'incoming':
+        return '#4CAF50';
+      case 'outgoing':
+        return '#2196F3';
+      case 'missed':
+        return '#FF5722';
+      default:
+        return '#666';
+    }
+  };
 
-          <TouchableOpacity
-            style={styles.navButton}
-            onPress={handleSkipCaller}
-          >
-            <Text style={styles.navButtonText}>Skip</Text>
-            <Icon name="chevron-right" size={20} color="#666" />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Call Button and Timer */}
-        <View style={styles.callSection}>
-          <TouchableOpacity
-            style={[
-              styles.callButton,
-              { backgroundColor: isCallActive ? '#F44336' : '#4CAF50' }
-            ]}
-            onPress={isCallActive ? handleEndCall : handleStartCall}
-          >
-            <Icon 
-              name={isCallActive ? "call-end" : "call"} 
-              size={40} 
-              color="#fff" 
-            />
-          </TouchableOpacity>
+  const getOutcomeColor = (outcome: string): string => {
+    switch (outcome) {
+      case 'interested':
+        return '#4CAF50';
+      case 'callback':
+        return '#FF9800';
+      case 'not_interested':
+        return '#FF5722';
+      case 'no_response':
+        return '#666';
+      default:
+        return '#666';
+    }
+  };
 
-          {/* Timer */}
-          <View style={styles.timerContainer}>
-            <Icon name="access-time" size={24} color="#666" />
-            <Text style={styles.timerText}>{formatTime(timer)}</Text>
-          </View>
+  const getOutcomeText = (outcome: string): string => {
+    switch (outcome) {
+      case 'interested':
+        return 'Interested';
+      case 'callback':
+        return 'Callback Required';
+      case 'not_interested':
+        return 'Not Interested';
+      case 'no_response':
+        return 'No Response';
+      default:
+        return outcome;
+    }
+  };
 
-          {/* Call Status */}
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
-            <Text style={[styles.statusText, { color: getStatusColor() }]}>
-              {getStatusText()}
-            </Text>
-          </View>
-        </View>
-
-        {/* Caller Details */}
-        <View style={styles.callerDetailsSection}>
-          <Text style={styles.sectionTitle}>Caller Details</Text>
-          
-          <View style={styles.callerCard}>
-            <View style={styles.avatarContainer}>
-              <Icon name="person" size={50} color="#666" />
-            </View>
-            
-            <View style={styles.callerInfo}>
-              <Text style={styles.callerName}>{currentCaller.name}</Text>
-              <Text style={styles.callerTitle}>
-                {currentCaller.designation} at {currentCaller.company}
-              </Text>
-              
-              <View style={styles.contactRow}>
-                <Icon name="phone" size={16} color="#666" />
-                <Text style={styles.contactText}>{currentCaller.phone}</Text>
-              </View>
-              
-              <View style={styles.contactRow}>
-                <Icon name="email" size={16} color="#666" />
-                <Text style={styles.contactText}>{currentCaller.email}</Text>
-              </View>
-              
-              <View style={styles.contactRow}>
-                <Icon name="location-on" size={16} color="#666" />
-                <Text style={styles.contactText}>{currentCaller.address}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Form Button */}
-        <TouchableOpacity
-          style={styles.formButton}
-          onPress={() => setShowForm(true)}
-        >
-          <Icon name="description" size={24} color="#fff" />
-          <Text style={styles.formButtonText}>Open Call Details Form</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
-
-  const renderForm = (): React.ReactElement => (
-    <Modal
-      visible={showForm}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={styles.formContainer}>
-        <StatusBar backgroundColor="#fff" barStyle="dark-content" />
-        
-        <View style={styles.formHeader}>
-          <Text style={styles.formTitle}>Call Details</Text>
-          <TouchableOpacity onPress={() => setShowForm(false)}>
-            <Icon name="close" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.formContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.formSection}>
-            <Text style={styles.formSectionTitle}>Call Information</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Call Purpose *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.callPurpose}
-                onChangeText={(text) => setFormData({...formData, callPurpose: text})}
-                placeholder="What was the purpose of this call?"
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Call Outcome *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.callOutcome}
-                onChangeText={(text) => setFormData({...formData, callOutcome: text})}
-                placeholder="What was the outcome?"
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Next Follow-up</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.nextFollowUp}
-                onChangeText={(text) => setFormData({...formData, nextFollowUp: text})}
-                placeholder="When should we follow up?"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Remarks</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                value={formData.remarks}
-                onChangeText={(text) => setFormData({...formData, remarks: text})}
-                placeholder="Additional remarks..."
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-          </View>
-
-          <View style={styles.formSection}>
-            <Text style={styles.formSectionTitle}>Quick Actions</Text>
-            
-            <TouchableOpacity
-              style={styles.checkboxRow}
-              onPress={() => setFormData({...formData, interested: !formData.interested})}
-            >
-              <Icon 
-                name={formData.interested ? "check-box" : "check-box-outline-blank"} 
-                size={24} 
-                color="#4CAF50" 
-              />
-              <Text style={styles.checkboxLabel}>Customer is interested</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.checkboxRow}
-              onPress={() => setFormData({...formData, appointmentScheduled: !formData.appointmentScheduled})}
-            >
-              <Icon 
-                name={formData.appointmentScheduled ? "check-box" : "check-box-outline-blank"} 
-                size={24} 
-                color="#4CAF50" 
-              />
-              <Text style={styles.checkboxLabel}>Appointment scheduled</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-
-        <View style={styles.formActions}>
-          <TouchableOpacity 
-            style={styles.cancelButton} 
-            onPress={() => setShowForm(false)}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.submitButton} 
-            onPress={handleFormSubmit}
-          >
-            <Text style={styles.submitButtonText}>Save Details</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
+  const toggleCallExpansion = (callId: string): void => {
+    setExpandedCallId(expandedCallId === callId ? null : callId);
+  };
 
   return (
     <Modal
@@ -635,18 +581,230 @@ const CallingInterface: React.FC<CallingInterfaceProps> = ({
       animationType="slide"
       presentationStyle="fullScreen"
     >
-      <View style={styles.app}>
-        {renderMainScreen()}
-        {renderForm()}
-      </View>
+      <SafeAreaView style={styles.container}>
+        <StatusBar backgroundColor="#f5f5f5" barStyle="dark-content" />
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Calling Interface</Text>
+            <Text style={styles.headerSubtitle}>
+              {currentCallerIndex + 1} of {CALLERS_DATA.length}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={handleCloseModal}>
+            <Icon name="close" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView 
+          style={styles.content} 
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Caller Navigation */}
+          <View style={styles.callerNavigation}>
+            <TouchableOpacity
+              style={[styles.navButton, currentCallerIndex === 0 && styles.navButtonDisabled]}
+              onPress={handlePreviousCaller}
+              disabled={currentCallerIndex === 0}
+            >
+              <Icon name="chevron-left" size={20} color={currentCallerIndex === 0 ? "#ccc" : "#666"} />
+              <Text style={[styles.navButtonText, currentCallerIndex === 0 && styles.navButtonTextDisabled]}>
+                Previous
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.callerCounter}>
+              <Text style={styles.counterText}>
+                Caller {currentCallerIndex + 1} of {CALLERS_DATA.length}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={handleSkipCaller}
+            >
+              <Text style={styles.navButtonText}>Skip</Text>
+              <Icon name="chevron-right" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Call Button and Timer */}
+          <View style={styles.callSection}>
+            <TouchableOpacity
+              style={[
+                styles.callButton,
+                isCallActive && styles.callButtonActive,
+                callStatus === 'connected' && styles.callButtonConnected
+              ]}
+              onPress={isCallActive ? handleEndCall : handleStartCall}
+            >
+              <Icon 
+                name={isCallActive ? "call-end" : "call"} 
+                size={40} 
+                color="#fff" 
+              />
+            </TouchableOpacity>
+
+            {/* Call Status */}
+            <View style={styles.callStatusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: getCallStatusColor() }]} />
+              <Text style={[styles.callStatusText, { color: getCallStatusColor() }]}>
+                {getCallStatusText()}
+              </Text>
+            </View>
+
+            {/* Timer */}
+            <View style={styles.timerContainer}>
+              <Icon name="access-time" size={24} color="#666" />
+              <Text style={styles.timerText}>{formatTime(timer)}</Text>
+            </View>
+
+            {/* Timer Status */}
+            <View style={styles.statusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: isTimerRunning ? '#4CAF50' : '#666' }]} />
+              <Text style={[styles.statusText, { color: isTimerRunning ? '#4CAF50' : '#666' }]}>
+                {isTimerRunning ? 'Timer Running' : 'Timer Stopped'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Caller Details */}
+          <View style={styles.callerDetailsSection}>
+            <Text style={styles.sectionTitle}>Caller Details</Text>
+            
+            <View style={styles.callerCard}>
+              <View style={styles.avatarContainer}>
+                <Icon name="person" size={50} color="#666" />
+              </View>
+              
+              <View style={styles.callerInfo}>
+                <Text style={styles.callerName}>{currentCaller.name}</Text>
+                <Text style={styles.callerTitle}>
+                  {currentCaller.designation} at {currentCaller.company}
+                </Text>
+                
+                <View style={styles.contactRow}>
+                  <Icon name="phone" size={16} color="#666" />
+                  <Text style={styles.contactText}>{currentCaller.phone}</Text>
+                </View>
+                
+                <View style={styles.contactRow}>
+                  <Icon name="email" size={16} color="#666" />
+                  <Text style={styles.contactText}>{currentCaller.email}</Text>
+                </View>
+                
+                <View style={styles.contactRow}>
+                  <Icon name="location-on" size={16} color="#666" />
+                  <Text style={styles.contactText}>{currentCaller.address}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Previous Call History */}
+          <View style={styles.previousCallsSection}>
+            <Text style={styles.sectionTitle}>
+              Previous Call History ({previousCalls.length})
+            </Text>
+            
+            {previousCalls.length === 0 ? (
+              <View style={styles.noCallsContainer}>
+                <Icon name="call" size={40} color="#ccc" />
+                <Text style={styles.noCallsText}>No previous calls with this contact</Text>
+                <Text style={styles.noCallsSubtext}>This will be your first interaction</Text>
+              </View>
+            ) : (
+              <View style={styles.callHistoryContainer}>
+                {previousCalls.map((call, index) => (
+                  <TouchableOpacity
+                    key={call.id}
+                    style={styles.callHistoryItem}
+                    onPress={() => toggleCallExpansion(call.id)}
+                  >
+                    <View style={styles.callHistoryHeader}>
+                      <View style={styles.callHistoryLeft}>
+                        <Icon 
+                          name={getCallTypeIcon(call.callType)} 
+                          size={20} 
+                          color={getCallTypeColor(call.callType)} 
+                        />
+                        <View style={styles.callHistoryInfo}>
+                          <Text style={styles.callHistoryDate}>
+                            {call.callDate} at {call.callTime}
+                          </Text>
+                          <Text style={styles.callHistoryDuration}>
+                            Duration: {call.duration}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.callHistoryRight}>
+                        <View style={[styles.outcomeTag, { backgroundColor: getOutcomeColor(call.outcome) }]}>
+                          <Text style={styles.outcomeText}>
+                            {getOutcomeText(call.outcome)}
+                          </Text>
+                        </View>
+                        <Icon 
+                          name={expandedCallId === call.id ? "expand-less" : "expand-more"} 
+                          size={24} 
+                          color="#666" 
+                        />
+                      </View>
+                    </View>
+
+                    {expandedCallId === call.id && (
+                      <View style={styles.callHistoryExpanded}>
+                        <View style={styles.callStatusRow}>
+                          <Text style={styles.callStatusLabel}>Status:</Text>
+                          <Text style={styles.callStatusValue}>{call.status.replace('_', ' ')}</Text>
+                        </View>
+                        
+                        <View style={styles.callNotesSection}>
+                          <Text style={styles.callNotesLabel}>Notes:</Text>
+                          <Text style={styles.callNotesText}>{call.notes}</Text>
+                        </View>
+                        
+                        {call.followUpDate && (
+                          <View style={styles.followUpSection}>
+                            <Icon name="event" size={16} color="#FF9800" />
+                            <Text style={styles.followUpText}>
+                              Follow-up: {call.followUpDate}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Form Button */}
+          <TouchableOpacity
+            style={styles.formButton}
+            onPress={() => setShowForm(true)}
+          >
+            <Icon name="description" size={24} color="#fff" />
+            <Text style={styles.formButtonText}>Open Call Details Form</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Your External Form Component */}
+        <CallConnectionForm
+          visible={showForm}
+          onClose={handleFormClose}
+          onSubmit={handleFormSubmit}
+          // callerDetails={currentCaller}
+        />
+      </SafeAreaView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  app: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
@@ -678,6 +836,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  contentContainer: {
+    paddingBottom: 30,
+  },
   callerNavigation: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -685,7 +846,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 15,
-    marginBottom: 20,
+    marginBottom: 25,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -722,7 +883,7 @@ const styles = StyleSheet.create({
   },
   callSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 25,
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 15,
@@ -736,14 +897,144 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
+    backgroundColor: '#4CAF50',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
+  },
+  callButtonActive: {
+    backgroundColor: '#FF5722',
+  },
+  callButtonConnected: {
+    backgroundColor: '#2196F3',
+  },
+  callStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  callStatusText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  previousCallsSection: {
+    marginBottom: 30,
+  },
+  noCallsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  noCallsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: 10,
+  },
+  noCallsSubtext: {
+    fontSize: 14,
+    color: '#aaa',
+    marginTop: 4,
+  },
+  callHistoryContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 10,
+  },
+  callHistoryItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingVertical: 12,
+  },
+  callHistoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  callHistoryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  callHistoryInfo: {
+    marginLeft: 10,
+  },
+  callHistoryDate: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  callHistoryDuration: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  callHistoryRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  outcomeTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  outcomeText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  callHistoryExpanded: {
+    marginTop: 10,
+    paddingLeft: 28,
+  },
+  callStatusRow: {
+    flexDirection: 'row',
+    marginBottom: 5,
+  },
+  callStatusLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginRight: 5,
+  },
+  callStatusValue: {
+    fontSize: 14,
+    color: '#777',
+  },
+  callNotesSection: {
+    marginTop: 5,
+    marginBottom: 10,
+  },
+  callNotesLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 3,
+  },
+  callNotesText: {
+    fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
+  },
+  followUpSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  followUpText: {
+    fontSize: 13,
+    color: '#FF9800',
+    marginLeft: 5,
   },
   timerContainer: {
     flexDirection: 'row',
@@ -846,106 +1137,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 10,
-  },
-  
-  // Form Styles
-  formContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  formHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  formContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  formSection: {
-    marginVertical: 20,
-  },
-  formSectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#333',
-    backgroundColor: '#f9f9f9',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 10,
-  },
-  formActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '600',
-  },
-  submitButton: {
-    flex: 1,
-    paddingVertical: 15,
-    borderRadius: 8,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-    marginLeft: 10,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
   },
 });
 

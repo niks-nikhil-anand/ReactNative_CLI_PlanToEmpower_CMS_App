@@ -87,12 +87,13 @@ android {
     }
    signingConfigs {
     release {
-        storeFile file(MYAPP_UPLOAD_STORE_FILE)
-        storePassword MYAPP_UPLOAD_STORE_PASSWORD
-        keyAlias MYAPP_UPLOAD_KEY_ALIAS
-        keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+        storeFile file(System.getenv("MYAPP_UPLOAD_STORE_FILE") ?: MYAPP_UPLOAD_STORE_FILE)
+        storePassword System.getenv("MYAPP_UPLOAD_STORE_PASSWORD") ?: MYAPP_UPLOAD_STORE_PASSWORD
+        keyAlias System.getenv("MYAPP_UPLOAD_KEY_ALIAS") ?: MYAPP_UPLOAD_KEY_ALIAS
+        keyPassword System.getenv("MYAPP_UPLOAD_KEY_PASSWORD") ?: MYAPP_UPLOAD_KEY_PASSWORD
     }
 }
+
      buildTypes {
     debug {
         signingConfig signingConfigs.debug
